@@ -27,6 +27,9 @@
 import abc
 from score.init import (
     ConfiguredModule, ConfigurationError, parse_list, parse_dotted_path)
+import contextlib
+import ast
+import code
 
 
 defaults = {
@@ -86,20 +89,44 @@ class ConfiguredShellModule(ConfiguredModule):
     def _finalize(self, score):
         self.score = score
 
-    def spawn(self):
+    def __call__(self, command=None):
+        with self._create_env() as env:
+            if not command:
+                return self.backend.spawn(env)
+            for node in ast.walk(ast.parse(command)):
+                name = _extract_dotted_path(node)
+                if not name:
+                    continue
+                try:
+                    module = __import__(name)
+                    if '.' not in name and name not in env:
+                        env[name] = module
+                except ImportError:
+                    pass
+            return eval(command, env)
+
+    @contextlib.contextmanager
+    def _create_env(self):
         env = {'score': self.score}
-        if self.ctx:
-            with self.ctx.Context() as ctx:
-                env['ctx'] = ctx
-                for callback in self.callbacks:
-                    callback(env)
-                self.backend.spawn(env)
-        else:
+        try:
+            if self.ctx:
+                env['ctx'] = self.ctx.Context()
             for callback in self.callbacks:
                 callback(env)
-            self.backend.spawn(env)
+            yield env
+            if self.ctx:
+                env['ctx'].destroy()
+        except Exception as e:
+            if self.ctx:
+                env['ctx'].destroy(e)
+            raise e
 
-    __call__ = spawn
+
+def _extract_dotted_path(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    elif isinstance(node, ast.Attribute):
+        return '%s.%s' % (_extract_dotted_path(node.value), node.attr)
 
 
 class Shell(abc.ABC):
@@ -148,7 +175,6 @@ class PythonShell(Shell):
         assert False, 'Should not be here'
 
     def _spawn(self, env):
-        import code
         code.interact(local=env)
 
 

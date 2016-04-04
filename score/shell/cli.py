@@ -25,16 +25,20 @@
 # Licensee has his registered seat, an establishment or assets.
 
 import click
+from pprint import pprint
 
 
 @click.command()
+@click.argument('command', required=False)
 @click.pass_context
-def main(clickctx):
+def main(clickctx, command=None):
     """
     Allows operating on the project in a REPL.
     """
     score = clickctx.obj['conf'].load()
-    score.shell()
+    result = score.shell(command)
+    if command and result is not None:
+        pprint(result)
 
 
 if __name__ == '__main__':
