@@ -25,6 +25,7 @@
 # Licensee has his registered seat, an establishment or assets.
 
 import click
+from score.init import init, parse_list
 from pprint import pprint
 
 
@@ -35,7 +36,21 @@ def main(clickctx, command=None):
     """
     Allows operating on the project in a REPL.
     """
-    score = clickctx.obj['conf'].load()
+    conf = clickctx.obj['conf'].parse()
+    if 'score.init' not in conf:
+        conf['score.init'] = {}
+    try:
+        modules = parse_list(conf['score.init']['modules'])
+    except KeyError:
+        conf['score.init']['modules'] = 'score.shell'
+    else:
+        for module in modules:
+            if module.startswith('score.shell'):
+                break
+        else:
+            modules.append('score.shell')
+            conf['score.init']['modules'] = '\n  ' + '\n  '.join(modules)
+    score = init(conf)
     result = score.shell(command)
     if command and result is not None:
         pprint(result)
