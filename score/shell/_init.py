@@ -44,11 +44,12 @@ def init(confdict, ctx=None):
     Initializes this module acoording to the :ref:`SCORE module initialization
     guidelines <module_initialization>` with the following configuration keys:
 
-    :confkey:`backend` :default:`[default=python]`
-        The shell backend to use. The only valid values are "python", "ipython"
-        and "bpython".
+    :confkey:`backend` :confdefault:`python`
+        The shell backend to use. You can use either of the shells prvided by
+        this module ("python", "ipython" and "bpython") or a string, that will
+        be resolved using :func:`score.init.parse_dotted_path`.
 
-    :confkey:`backend.autoinstall` :default:`[default=True]`
+    :confkey:`backend.autoinstall` :confdefault:`True`
         Whether the given *backend* should be installed automatically, if it was
         not found.
 
@@ -64,9 +65,7 @@ def init(confdict, ctx=None):
     conf.update(confdict)
     shell_cls = Shell.get(conf['backend'])
     if not shell_cls:
-        import score.shell
-        raise ConfigurationError(score.shell,
-                                 "Invalid backend `%s'" % conf['backend'])
+        shell_cls = parse_dotted_path(conf['backend'])
     backend = shell_cls(conf['backend.autoinstall'])
     callbacks = []
     for path in parse_list(conf['callbacks']):
@@ -78,6 +77,32 @@ def init(confdict, ctx=None):
 
 
 class ConfiguredShellModule(ConfiguredModule):
+    """
+    This module's :class:`configuration class <score.init.ConfiguredModule>`.
+
+    It also implements a `__call__()` method for evaluating arbitrary one-liners
+    inside the shell environment and returning the result:
+
+    >>> from score.init import init_from_file
+    >>> score = init_from_file('path/to/your/config.file')
+    >>> score.shell('1 + 1')
+    2
+    >>> score.shell('get_cheese("Stilton")')
+    "I'll have a look, sir ... nnnnnnnnnnnnnnnno."
+
+    It is also possible to use this feature without any command, in which case
+    you will get an instance of the configured shell backend:
+
+    >>> score.shell()
+    Python 3.4.3 (default, Jan  8 2016, 11:18:01)
+    [GCC 5.3.0] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> get_cheese('Red Leicester')
+    "I'm, afraid we're fresh out of that, sir."
+    >>> exit()
+    >>> # we left the spawned shell and landed on the original shell
+    >>> # (the one we called score.shell() on)
+    """
 
     def __init__(self, ctx, backend, callbacks):
         import score.shell
@@ -130,12 +155,16 @@ def _extract_dotted_path(node):
 
 
 class Shell(abc.ABC):
+    """
+    Abstract base class for shell backends.
+    """
 
     @staticmethod
     def get(name):
         return {
             'python': PythonShell,
             'ipython': IPythonShell,
+            'bpython': BPythonShell,
         }.get(name)
 
     def __init__(self, name, autoinstall):
@@ -143,6 +172,11 @@ class Shell(abc.ABC):
         self.autoinstall = autoinstall
 
     def spawn(self, env):
+        """
+        Creates an interactive instance of this shell, where all variables from
+        given *env* are available. Performs possible auto-installation and
+        passes the control to :meth:`_spawn` for the ractual work.
+        """
         if not self._is_available():
             if not self.autoinstall:
                 raise Exception("Configured shell `%s' not available"
@@ -152,14 +186,32 @@ class Shell(abc.ABC):
 
     @abc.abstractmethod
     def _is_available(self):
+        """
+        Whether this shell is installed. Must return `True`, if this shell's
+        :meth:`_spawn` could be called immediately or `False`, if it's
+        :meth:`_install` needs to be invoked first.
+        """
         pass
 
     @abc.abstractmethod
     def _install(self):
+        """
+        Installs this shell into the current virtual environment. The easiest
+        implementation of this function is:
+
+        .. code-block:: python
+
+            import pip
+            pip.main(['install', 'myshell'])
+        """
         pass
 
     @abc.abstractmethod
     def _spawn(self, env):
+        """
+        Creates an interactive instance of this shell, where all variables from
+        given *env* are available.
+        """
         pass
 
 
