@@ -26,5 +26,6 @@
 
 from ._init import init, ConfiguredShellModule, Shell
 
+__version__ = '0.0.2'
 
 __all__ = ('init', 'ConfiguredShellModule', 'Shell')
