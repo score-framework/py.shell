@@ -30,9 +30,10 @@ from pprint import pprint
 
 
 @click.command()
+@click.option('-b', '--backend')
 @click.argument('command', required=False)
 @click.pass_context
-def main(clickctx, command=None):
+def main(clickctx, backend=None, command=None):
     """
     Allows operating on the project in a REPL.
     """
@@ -50,6 +51,11 @@ def main(clickctx, command=None):
         else:
             modules.append('score.shell')
             conf['score.init']['modules'] = '\n  ' + '\n  '.join(modules)
+    if backend:
+        try:
+            conf['shell']['backend'] = backend
+        except KeyError:
+            conf['shell'] = {'backend': backend}
     score = init(conf)
     result = score.shell(command)
     if command and result is not None:
