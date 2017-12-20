@@ -54,12 +54,15 @@ register callback functions in your configuration file to add them at startup:
     >>> get_cheese('Red Leicester')
     "I'm afraid we never have that at the end of the week, sir, we get it fresh on Monday."
 
-You can also use ipython or bpython if you want:
+You can also use ipython_ or bpython_ if you want:
 
 .. code-block:: ini
 
     [shell]
     backend = bpython
+
+.. _ipython: https://ipython.org/
+.. _bpython: https://bpython-interpreter.org/
 
 Configuration
 =============
